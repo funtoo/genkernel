@@ -1084,7 +1084,7 @@ setup_md_device() {
 			mknod /dev/md${MD_NUMBER} b 9 ${MD_NUMBER} >/dev/null 2>&1
 			[ $? -ne 0 ] && bad_msg "Creation of /dev/md${MD_NUMBER} failed..."
 		fi
-		mdstart ${MDPART} /dev/md${MD_NUMBER}
+		mdadm --assemble /dev/md${MD_NUMBER}
 	fi
 }
 
