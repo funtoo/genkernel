@@ -709,12 +709,12 @@ startVolumes() {
 				then
 					good_msg "LUKS detected. Reimporting ${ZFS_POOL}"
 					/sbin/zpool export -f "${ZFS_POOL}"
-					/sbin/zpool import -N ${ZPOOL_FORCE} "${ZFS_POOL}"
+					/sbin/zpool import -c /etc/zfs/zpool.cache -N ${ZPOOL_FORCE} "${ZFS_POOL}"
 				fi
 			else
 				good_msg "Importing ZFS pool ${ZFS_POOL}"
 
-				/sbin/zpool import -N ${ZPOOL_FORCE} "${ZFS_POOL}"
+				/sbin/zpool import -c /etc/zfs/zpool.cache -N ${ZPOOL_FORCE} "${ZFS_POOL}"
 
 				if [ "$?" = '0' ]
 				then
