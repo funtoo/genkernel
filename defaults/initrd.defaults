@@ -81,4 +81,4 @@ DEFAULT_NFSOPTIONS="ro,nolock,rsize=1024,wsize=1024"
 # Only sections that are in by default or those that
 # are not module groups need to be defined here...
 HWOPTS='keymap cache modules aa_hyperv nvme sata scsi pata usb firewire waitscan slowusb lvm dmraid mdadm fs net virtio'
-MY_HWOPTS='modules sata scsi aa_hyperv nvme pata slowusb usb firewire waitscan dmraid mdadm fs net iscsi crypto virtio'
+MY_HWOPTS='modules nvme sata scsi aa_hyperv pata slowusb usb firewire waitscan dmraid mdadm fs net iscsi crypto virtio'
