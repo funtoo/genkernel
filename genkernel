@@ -1,8 +1,7 @@
 #!/bin/bash
-# $Id$
 
 PATH="${PATH}:/sbin:/usr/sbin"
-GK_V='4-funkernel'
+GK_V='##VERSION##'
 
 # Set the default for TMPDIR.  May be modified by genkernel.conf or the
 # --tempdir command line option.
