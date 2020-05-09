@@ -8,11 +8,11 @@ CPIO_ARGS="--quiet -o -H newc"
 # - You may use the code of copy_binaries() as CC0 outside of genkernel
 # - Contributions to this function are licensed under CC0 as well.
 # - If you change it outside of genkernel, please consider sending your
-#   modifications back to genkernel@gentoo.org.
+#	modifications back to genkernel@gentoo.org.
 #
 # On a side note: "Both public domain works and the simple license provided by
-#                  CC0 are compatible with the GNU GPL."
-#                 (from https://www.gnu.org/licenses/license-list.html#CC0)
+#				   CC0 are compatible with the GNU GPL."
+#				  (from https://www.gnu.org/licenses/license-list.html#CC0)
 #
 # Written by:
 # - Sebastian Pipping <sebastian@pipping.org> (error checking)
@@ -57,50 +57,55 @@ log_future_cpio_content() {
 	fi
 }
 
+append_to_cpio() {
+	cd "$1" || gen_die "Can't find directory: $1"
+	log_future_cpio_content
+	# Normalize lib directory structure to all be in /lib:
+	for libdir in lib64 usr/lib usr/lib64; do
+		if [ -d $libdir ]; then
+			rsync -a $libdir/ lib/
+			rm -rf $libdir
+		fi
+	done
+	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" || gen_die "appending $1 cpio"
+	cd ${TEMP}
+	rm -rf "${1}" > /dev/null
+}
+
+try() {
+	$* || gen_die "command fail: $*"
+}
+
 append_base_layout() {
 	if [ -d "${TEMP}/initramfs-base-temp" ]
 	then
 		rm -rf "${TEMP}/initramfs-base-temp" > /dev/null
 	fi
 
-	mkdir -p ${TEMP}/initramfs-base-temp/dev
-	mkdir -p ${TEMP}/initramfs-base-temp/bin
-	mkdir -p ${TEMP}/initramfs-base-temp/etc
-	mkdir -p ${TEMP}/initramfs-base-temp/usr
-	mkdir -p ${TEMP}/initramfs-base-temp/lib
-	mkdir -p ${TEMP}/initramfs-base-temp/mnt
-	mkdir -p ${TEMP}/initramfs-base-temp/run
-	mkdir -p ${TEMP}/initramfs-base-temp/sbin
-	mkdir -p ${TEMP}/initramfs-base-temp/proc
-	mkdir -p ${TEMP}/initramfs-base-temp/temp
-	mkdir -p ${TEMP}/initramfs-base-temp/tmp
-	mkdir -p ${TEMP}/initramfs-base-temp/sys
-	mkdir -p ${TEMP}/initramfs-temp/.initrd
-	mkdir -p ${TEMP}/initramfs-base-temp/var/lock/dmraid
-	mkdir -p ${TEMP}/initramfs-base-temp/sbin
-	mkdir -p ${TEMP}/initramfs-base-temp/usr/bin
-	mkdir -p ${TEMP}/initramfs-base-temp/usr/sbin
-	ln -s  lib  ${TEMP}/initramfs-base-temp/lib64
-
-	echo "/dev/ram0     /           ext2    defaults	0 0" > ${TEMP}/initramfs-base-temp/etc/fstab
+	try mkdir -p ${TEMP}/initramfs-base-temp/dev 
+	try mkdir -p ${TEMP}/initramfs-base-temp/bin 
+	try mkdir -p ${TEMP}/initramfs-base-temp/etc
+	try mkdir -p ${TEMP}/initramfs-base-temp/usr
+	try mkdir -p ${TEMP}/initramfs-base-temp/lib
+	try ln -s lib ${TEMP}/initramfs-base-temp/lib64
+	try ln -s ../lib ${TEMP}/initramfs-base-temp/usr/lib
+	try ln -s ../lib ${TEMP}/initramfs-base-temp/usr/lib64
+	try mkdir -p ${TEMP}/initramfs-base-temp/mnt
+	try mkdir -p ${TEMP}/initramfs-base-temp/run
+	try mkdir -p ${TEMP}/initramfs-base-temp/sbin
+	try mkdir -p ${TEMP}/initramfs-base-temp/proc
+	try mkdir -p ${TEMP}/initramfs-base-temp/temp
+	try mkdir -p ${TEMP}/initramfs-base-temp/tmp
+	try mkdir -p ${TEMP}/initramfs-base-temp/sys
+	try mkdir -p ${TEMP}/initramfs-temp/.initrd
+	try mkdir -p ${TEMP}/initramfs-base-temp/var/lock/dmraid
+	try mkdir -p ${TEMP}/initramfs-base-temp/sbin
+	try mkdir -p ${TEMP}/initramfs-base-temp/usr/bin
+	try mkdir -p ${TEMP}/initramfs-base-temp/usr/sbin
+	echo "/dev/ram0     /           ext2    defaults        0 0" > ${TEMP}/initramfs-base-temp/etc/fstab
 	echo "proc          /proc       proc    defaults    0 0" >> ${TEMP}/initramfs-base-temp/etc/fstab
-
-	cd ${TEMP}/initramfs-base-temp/dev
-	mknod -m 660 console c 5 1
-	mknod -m 660 null c 1 3
-	mknod -m 660 zero c 1 5
-	mknod -m 600 tty0 c 4 0
-	mknod -m 600 tty1 c 4 1
-	mknod -m 600 ttyS0 c 4 64
-
 	date -u '+%Y%m%d-%H%M%S' > ${TEMP}/initramfs-base-temp/etc/build_date
-
-	cd "${TEMP}/initramfs-base-temp/"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing baselayout cpio"
-	cd "${TEMP}"
-	rm -rf "${TEMP}/initramfs-base-temp" > /dev/null
+	append_to_cpio "${TEMP}/initramfs-base-temp/" baselayout
 }
 
 append_busybox() {
@@ -124,13 +129,7 @@ append_busybox() {
 		ln -s busybox ${TEMP}/initramfs-busybox-temp/bin/$i ||
 			gen_die "Busybox error: could not link ${i}!"
 	done
-
-	cd "${TEMP}/initramfs-busybox-temp/"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing busybox cpio"
-	cd "${TEMP}"
-	rm -rf "${TEMP}/initramfs-busybox-temp" > /dev/null
+	append_to_cpio "${TEMP}/initramfs-busybox-temp/" busybox
 }
 
 append_blkid(){
@@ -144,28 +143,8 @@ append_blkid(){
 	if [[ "${DISKLABEL}" = "1" ]]; then
 		copy_binaries "${TEMP}"/initramfs-blkid-temp/ /sbin/blkid
 	fi
-
-	cd "${TEMP}/initramfs-blkid-temp/"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing blkid cpio"
-	cd "${TEMP}"
-	rm -rf "${TEMP}/initramfs-blkid-temp" > /dev/null
+	append_to_cpio "${TEMP}/initramfs-blkid-temp/" blkid
 }
-
-#append_fuse() {
-#	if [ -d "${TEMP}/initramfs-fuse-temp" ]
-#	then
-#		rm -r "${TEMP}/initramfs-fuse-temp"
-#	fi
-#	cd ${TEMP}
-#	mkdir -p "${TEMP}/initramfs-fuse-temp/lib/"
-#	tar -C "${TEMP}/initramfs-fuse-temp/lib/" -xjf "${FUSE_BINCACHE}"
-#	cd "${TEMP}/initramfs-fuse-temp/"
-#	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-#			|| gen_die "compressing fuse cpio"
-#	rm -rf "${TEMP}/initramfs-fuse-temp" > /dev/null
-#}
 
 append_unionfs_fuse() {
 	if [ -d "${TEMP}/initramfs-unionfs-fuse-temp" ]
@@ -177,33 +156,8 @@ append_unionfs_fuse() {
 	bzip2 -dc "${UNIONFS_FUSE_BINCACHE}" > "${TEMP}/initramfs-unionfs-fuse-temp/sbin/unionfs" ||
 		gen_die 'Could not extract unionfs-fuse binary cache!'
 	chmod a+x "${TEMP}/initramfs-unionfs-fuse-temp/sbin/unionfs"
-	cd "${TEMP}/initramfs-unionfs-fuse-temp/"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing unionfs fuse cpio"
-	cd "${TEMP}"
-	rm -rf "${TEMP}/initramfs-unionfs-fuse-temp" > /dev/null
+	append_to_cpio "${TEMP}/initramfs-unionfs-fuse-temp/" unionfs_fuse
 }
-
-#append_suspend(){
-#	if [ -d "${TEMP}/initramfs-suspend-temp" ];
-#	then
-#		rm -r "${TEMP}/initramfs-suspend-temp/"
-#	fi
-#	print_info 1 'SUSPEND: Adding support (compiling binaries)...'
-#	compile_suspend
-#	mkdir -p "${TEMP}/initramfs-suspend-temp/"
-#	/bin/tar -jxpf "${SUSPEND_BINCACHE}" -C "${TEMP}/initramfs-suspend-temp" ||
-#		gen_die "Could not extract suspend binary cache!"
-#	mkdir -p "${TEMP}/initramfs-suspend-temp/etc"
-#	cp -f /etc/suspend.conf "${TEMP}/initramfs-suspend-temp/etc" ||
-#		gen_die 'Could not copy /etc/suspend.conf'
-#	cd "${TEMP}/initramfs-suspend-temp/"
-#	log_future_cpio_content
-#	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-#			|| gen_die "compressing suspend cpio"
-#	rm -r "${TEMP}/initramfs-suspend-temp/"
-#}
 
 append_multipath(){
 	if [ -d "${TEMP}/initramfs-multipath-temp" ]
@@ -214,7 +168,7 @@ append_multipath(){
 	mkdir -p "${TEMP}"/initramfs-multipath-temp/{bin,etc,sbin,lib}/
 
 	# Copy files
-	copy_binaries "${TEMP}/initramfs-multipath-temp" /sbin/{multipath,kpartx,mpath_prio_*,dmsetup} /lib64/udev/scsi_id /bin/mountpoint
+	copy_binaries "${TEMP}/initramfs-multipath-temp" /sbin/{multipath,kpartx,mpath_prio_*,dmsetup} /lib/udev/scsi_id /bin/mountpoint
 
 	if [ -x /sbin/multipath ]
 	then
@@ -226,12 +180,7 @@ append_multipath(){
 	then
 		cp /etc/scsi_id.config "${TEMP}/initramfs-multipath-temp/etc/" || gen_die 'could not copy scsi_id.config'
 	fi
-	cd "${TEMP}/initramfs-multipath-temp"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing multipath cpio"
-	cd "${TEMP}"
-	rm -r "${TEMP}/initramfs-multipath-temp/"
+	append_to_cpio "${TEMP}/initramfs-multipath-temp" multipath
 }
 
 append_dmraid(){
@@ -252,11 +201,7 @@ append_dmraid(){
 		ln -sf raid456.kp raid45.ko
 		cd "${TEMP}/initramfs-dmraid-temp/"
 	fi
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing dmraid cpio"
-	cd "${TEMP}"
-	rm -r "${TEMP}/initramfs-dmraid-temp/"
+	append_to_cpio "${TEMP}/initramfs-dmraid-temp/" dmraid
 }
 
 append_iscsi(){
@@ -271,12 +216,7 @@ append_iscsi(){
 	/bin/bzip2 -dc "${ISCSI_BINCACHE}" > "${TEMP}/initramfs-iscsi-temp/bin/iscsistart" ||
 		gen_die "Could not extract iscsi binary cache!"
 	chmod a+x "${TEMP}/initramfs-iscsi-temp/bin/iscsistart"
-	cd "${TEMP}/initramfs-iscsi-temp/"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing iscsi cpio"
-	cd "${TEMP}"
-	rm -rf "${TEMP}/initramfs-iscsi-temp" > /dev/null
+	append_to_cpio "${TEMP}/initramfs-iscsi-temp/" iscsi
 }
 
 append_lvm(){
@@ -287,57 +227,47 @@ append_lvm(){
 	cd ${TEMP}
 	mkdir -p "${TEMP}/initramfs-lvm-temp/bin/"
 	mkdir -p "${TEMP}/initramfs-lvm-temp/etc/lvm/"
-	print_info 1 '          LVM: Adding support (using local static binary /sbin/lvm.static)...'
+	print_info 1 '			LVM: Adding support (using local static binary /sbin/lvm.static)...'
 	cp /sbin/lvm.static "${TEMP}/initramfs-lvm-temp/bin/lvm" || gen_die 'Could not copy over lvm!'
 	if [ -e /etc/lvm/lvm.conf ]; then
 		cp /etc/lvm/lvm.conf "${TEMP}/initramfs-lvm-temp/etc/lvm/" || gen_die 'Could not copy over lvm.conf!'
 	fi
-	cd "${TEMP}/initramfs-lvm-temp/"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing lvm cpio"
-	cd "${TEMP}"
-	rm -r "${TEMP}/initramfs-lvm-temp/"
+	append_to_cpio "${TEMP}/initramfs-lvm-temp/" lvm
 }
 
 append_mdadm(){
-        if [ -d "${TEMP}/initramfs-mdadm-temp" ]
-        then
-                rm -r "${TEMP}/initramfs-mdadm-temp/"
-        fi
-        cd ${TEMP}
-        mkdir -p "${TEMP}/initramfs-mdadm-temp/etc/"
-        mkdir -p "${TEMP}/initramfs-mdadm-temp/sbin/"
-        if [ "${MDADM}" = '1' ]
-        then
-                if [ -n "${MDADM_CONFIG}" ]
-                then
-                        if [ -f "${MDADM_CONFIG}" ]
-                        then
-                                cp -a "${MDADM_CONFIG}" "${TEMP}/initramfs-mdadm-temp/etc/mdadm.conf" \
-                                 || gen_die "Could not copy mdadm.conf!"
-                        else
-                                gen_die 'sl${MDADM_CONFIG} does not exist!'
-                        fi
-                else
-                        print_info 1 '          MDADM: Skipping inclusion of mdadm.conf'
-                fi
+	if [ -d "${TEMP}/initramfs-mdadm-temp" ]
+	then
+			rm -r "${TEMP}/initramfs-mdadm-temp/"
+	fi
+	cd ${TEMP}
+	mkdir -p "${TEMP}/initramfs-mdadm-temp/etc/"
+	mkdir -p "${TEMP}/initramfs-mdadm-temp/sbin/"
+	if [ "${MDADM}" = '1' ]
+	then
+			if [ -n "${MDADM_CONFIG}" ]
+			then
+					if [ -f "${MDADM_CONFIG}" ]
+					then
+							cp -a "${MDADM_CONFIG}" "${TEMP}/initramfs-mdadm-temp/etc/mdadm.conf" \
+							 || gen_die "Could not copy mdadm.conf!"
+					else
+							gen_die 'sl${MDADM_CONFIG} does not exist!'
+					fi
+			else
+					print_info 1 '			MDADM: Skipping inclusion of mdadm.conf'
+			fi
 
-                if [ -e '/sbin/mdadm' ] && LC_ALL="C" ldd /sbin/mdadm | grep -q 'not a dynamic executable' \
-                && [ -e '/sbin/mdmon' ] && LC_ALL="C" ldd /sbin/mdmon | grep -q 'not a dynamic executable'
-                then
-                        print_info 1 '          MDADM: Adding support (using local static binaries /sbin/mdadm and /sbin/mdmon)...'
-                        copy_binaries "${TEMP}/initramfs-mdadm-temp" /sbin/{mdadm,mdmon} || gen_die 'Could not copy over mdadm!'
-                else
-                        gen_die "Could not find /sbin/mdadm or /sbin/mdmon for initramfs"
-                fi
-        fi
-        cd "${TEMP}/initramfs-mdadm-temp/"
-        log_future_cpio_content
-        find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-                        || gen_die "compressing mdadm cpio"
-        cd "${TEMP}"
-        rm -rf "${TEMP}/initramfs-mdadm-temp" > /dev/null
+			if [ -e '/sbin/mdadm' ] && LC_ALL="C" ldd /sbin/mdadm | grep -q 'not a dynamic executable' \
+			&& [ -e '/sbin/mdmon' ] && LC_ALL="C" ldd /sbin/mdmon | grep -q 'not a dynamic executable'
+			then
+					print_info 1 '			MDADM: Adding support (using local static binaries /sbin/mdadm and /sbin/mdmon)...'
+					copy_binaries "${TEMP}/initramfs-mdadm-temp" /sbin/{mdadm,mdmon} || gen_die 'Could not copy over mdadm!'
+			else
+					gen_die "Could not find /sbin/mdadm or /sbin/mdmon for initramfs"
+			fi
+	fi
+	append_to_cpio "${TEMP}/initramfs-mdadm-temp/" mdadm
 }
 
 append_zfs(){
@@ -347,6 +277,11 @@ append_zfs(){
 	fi
 
 	mkdir -p "${TEMP}/initramfs-zfs-temp/etc/zfs"
+	
+	modprobe zfs 2>&1
+	if [ $? -ne 0 ]; then
+		gen_die "Trying to set up ZFS initramfs but can't load ZFS modules."
+	fi
 
 	# Copy cachefiles for each pool, if they exist
 	for pool in $(zpool list -H|cut -f1)
@@ -360,14 +295,14 @@ append_zfs(){
 			print_warning 1 " No cachefile set on ZFS pool '${pool}'!"
 			print_warning 1 " Startup times will be VERY SLOW as a result."
 			print_warning 1 " To set a cachefile, run a command like this:"
-			print_warning 1 "    zpool set cachefile=/etc/zfs/zpool-${pool}.cache ${pool}"
+			print_warning 1 "	 zpool set cachefile=/etc/zfs/zpool-${pool}.cache ${pool}"
 			print_warning 1 " ... then re-run genkernel."
 			print_warning 1 "---------------------------------------------------------"
 		else
 			# cachefile set, copy to normalized location
 			cp -a "${pool_cachefile}" "${TEMP}/initramfs-zfs-temp/etc/zfs/zpool-${pool}.cache" 2>/dev/null \
 				|| gen_dir "Could not copy file ${pool_cachefile} for ZFS"
-        	fi
+			fi
 	done
 
 	# Copy binaries
@@ -381,34 +316,21 @@ append_zfs(){
 	fi
 
 	copy_binaries "${TEMP}/initramfs-zfs-temp" /sbin/{mount.zfs,zdb,zfs,zpool} ${libgccpath}
-	cd "${TEMP}/initramfs-zfs-temp/lib64"
-	ln -s "..${libgccpath}"
-
-	cd "${TEMP}/initramfs-zfs-temp/"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing zfs cpio"
-	cd "${TEMP}"
-	rm -rf "${TEMP}/initramfs-zfs-temp" > /dev/null
+	cd "${TEMP}/initramfs-zfs-temp/lib"
+	append_to_cpio "${TEMP}/initramfs-zfs-temp/"
 }
 
 append_btrfs() {
-    if [ -d "${TEMP}/initramfs-btrfs-temp" ]
-    then
+	if [ -d "${TEMP}/initramfs-btrfs-temp" ]
+	then
 	rm -r "${TEMP}/initramfs-btrfs-temp"
-    fi
+	fi
 
-    mkdir -p "${TEMP}/initramfs-btrfs-temp"
+	mkdir -p "${TEMP}/initramfs-btrfs-temp"
 
-    # Copy binaries
-    copy_binaries "${TEMP}/initramfs-btrfs-temp" /sbin/btrfs
-
-    cd "${TEMP}/initramfs-btrfs-temp/"
-    log_future_cpio_content
-    find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-		    || gen_die "compressing btrfs cpio"
-    cd "${TEMP}"
-    rm -rf "${TEMP}/initramfs-btrfs-temp" > /dev/null
+	# Copy binaries
+	copy_binaries "${TEMP}/initramfs-btrfs-temp" /sbin/btrfs
+	append_to_cpio "${TEMP}/initramfs-btrfs-temp/" btrfs
 }
 
 append_splash(){
@@ -417,7 +339,7 @@ append_splash(){
 	then
 		[ -z "${SPLASH_THEME}" ] && [ -e /etc/conf.d/splash ] && source /etc/conf.d/splash
 		[ -z "${SPLASH_THEME}" ] && SPLASH_THEME=default
-		print_info 1 "  >> Installing splash [ using the ${SPLASH_THEME} theme ]..."
+		print_info 1 "	>> Installing splash [ using the ${SPLASH_THEME} theme ]..."
 		if [ -d "${TEMP}/initramfs-splash-temp" ]
 		then
 			rm -r "${TEMP}/initramfs-splash-temp/"
@@ -431,14 +353,9 @@ append_splash(){
 			mkdir -p "${TEMP}/initramfs-splash-temp/etc"
 			cp -f "/usr/share/splashutils/initrd.splash" "${TEMP}/initramfs-splash-temp/etc"
 		fi
-		cd "${TEMP}/initramfs-splash-temp/"
-		log_future_cpio_content
-		find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing splash cpio"
-		cd "${TEMP}"
-		rm -r "${TEMP}/initramfs-splash-temp/"
+		append_to_cpio "${TEMP}/initramfs-splash-temp/" splash
 	else
-		print_warning 1 '               >> No splash detected; skipping!'
+		print_warning 1 '				>> No splash detected; skipping!'
 	fi
 }
 
@@ -450,7 +367,7 @@ append_overlay(){
 }
 
 append_luks() {
-	local _luks_error_format="LUKS support cannot be included: %s.  Please emerge sys-fs/cryptsetup[static]."
+	local _luks_error_format="LUKS support cannot be included: %s.	Please emerge sys-fs/cryptsetup[static]."
 	local _luks_source=/sbin/cryptsetup
 	local _luks_dest=/sbin/cryptsetup
 
@@ -471,13 +388,8 @@ append_luks() {
 		print_info 1 "Including LUKS support"
 		copy_binaries "${TEMP}/initramfs-luks-temp/" /sbin/cryptsetup
 	fi
-
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-		|| gen_die "appending cryptsetup to cpio"
-
-	cd "${TEMP}"
-	rm -r "${TEMP}/initramfs-luks-temp/"
+	
+	append_to_cpio "${TEMP}/initramfs-luks-temp" luks
 }
 
 append_dropbear(){
@@ -506,7 +418,7 @@ append_dropbear(){
 	fi
 
 	cd "${TEMP}" \
-                || gen_die "cd '${TEMP}' failed"
+				|| gen_die "cd '${TEMP}' failed"
 	mkdir -p ${TEMP}/initramfs-dropbear-temp/var/run
 	mkdir -p ${TEMP}/initramfs-dropbear-temp/var/log
 	mkdir -p ${TEMP}/initramfs-dropbear-temp/etc/dropbear
@@ -517,14 +429,8 @@ append_dropbear(){
 	cp -L /etc/dropbear/{dropbear_rsa_host_key,dropbear_dss_host_key} ${TEMP}/initramfs-dropbear-temp/etc/dropbear/
 	cp -L /etc/dropbear/authorized_keys ${TEMP}/initramfs-dropbear-temp/root/.ssh
 	cp -L /etc/localtime ${TEMP}/initramfs-dropbear-temp/etc/
-	if [ ${ARCH} = "x86_64" ]
-	then
-		mkdir -p ${TEMP}/initramfs-dropbear-temp/lib64
-		cp -L /lib64/libnss_files.so.2 ${TEMP}/initramfs-dropbear-temp/lib64/
-	else
-		mkdir -p ${TEMP}/initramfs-dropbear-temp/lib
-		cp -L /lib/libnss_files.so.2 ${TEMP}/initramfs-dropbear-temp/lib/
-	fi
+	mkdir -p ${TEMP}/initramfs-dropbear-temp/lib
+	cp -L /lib/libnss_files.so.2 ${TEMP}/initramfs-dropbear-temp/lib/
 
 	sed "s/compat/files/g" /etc/nsswitch.conf > ${TEMP}/initramfs-dropbear-temp/etc/nsswitch.conf
 	echo "root:x:0:0:root:/root:/bin/login-remote.sh" > ${TEMP}/initramfs-dropbear-temp/etc/passwd
@@ -544,11 +450,7 @@ append_dropbear(){
 	copy_binaries "${TEMP}"/initramfs-dropbear-temp/ /usr/sbin/dropbear \
 		/bin/login /usr/bin/passwd
 
-	log_future_cpio_content
-	cd "${TEMP}"/initramfs-dropbear-temp \
-		|| gen_die "cd '${TEMP}/initramfs-dropbear-temp' failed"
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}"
-	rm -rf "${TEMP}"/initramfs-dropbear-temp > /dev/null
+	append_to_cpio "${TEMP}"/initramfs-dropbear-temp dropbear
 }
 
 append_firmware() {
@@ -574,11 +476,7 @@ append_firmware() {
 	else
 		cp -a "${FIRMWARE_SRC}"/* ${TEMP}/initramfs-firmware-temp/lib/firmware/
 	fi
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-		|| gen_die "appending firmware to cpio"
-	cd "${TEMP}"
-	rm -r "${TEMP}/initramfs-firmware-temp/"
+	append_to_cpio `pwd` firmware
 }
 
 append_gpg() {
@@ -595,10 +493,7 @@ append_gpg() {
 	bzip2 -dc "${GPG_BINCACHE}" > "${TEMP}/initramfs-gpg-temp/sbin/gpg" ||
 		gen_die 'Could not extract gpg binary cache!'
 	chmod a+x "${TEMP}/initramfs-gpg-temp/sbin/gpg"
-	cd "${TEMP}/initramfs-gpg-temp/"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}"
-	rm -rf "${TEMP}/initramfs-gpg-temp" > /dev/null
+	append_to_cpio "${TEMP}/initramfs-gpg-temp/" gpg
 }
 
 print_list()
@@ -651,11 +546,7 @@ append_modules() {
 	cd "${TEMP}/initramfs-modules-${KV}-temp/"
 	# module strip:
 	find -iname *.ko -exec strip --strip-debug {} \;
-	log_future_cpio_content
-	find . | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing modules cpio"
-	cd "${TEMP}"
-	rm -r "${TEMP}/initramfs-modules-${KV}-temp/"	
+	append_to_cpio `pwd` modules
 }
 
 append_modprobed() {
@@ -684,13 +575,7 @@ append_modprobed() {
 		done < "${dir}"
 	done
 
-	cd "${TDIR}"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing modprobe.d cpio"
-
-	cd "${TEMP}"
-	rm -rf "${TDIR}" > /dev/null
+	append_to_cpio "${TDIR}" modprobe.d
 }
 
 # check for static linked file with objdump
@@ -709,7 +594,7 @@ append_auxilary() {
 	if [ -f "${CMD_LINUXRC}" ]
 	then
 		cp "${CMD_LINUXRC}" "${TEMP}/initramfs-aux-temp/init"
-		print_info 2 "        >> Copying user specified linuxrc: ${CMD_LINUXRC} to init"
+		print_info 2 "		  >> Copying user specified linuxrc: ${CMD_LINUXRC} to init"
 	else
 		if isTrue ${NETBOOT}
 		then
@@ -771,7 +656,7 @@ append_auxilary() {
 	fi
 	if isTrue $CMD_KEYMAP
 	then
-		print_info 1 "        >> Copying keymaps"
+		print_info 1 "		  >> Copying keymaps"
 		mkdir -p "${TEMP}/initramfs-aux-temp/lib/"
 		cp -R "${GK_SHARE}/defaults/keymaps" "${TEMP}/initramfs-aux-temp/lib/" \
 				|| gen_die "Error while copying keymaps"
@@ -790,12 +675,7 @@ append_auxilary() {
 		cp -pPRf * "${TEMP}/initramfs-aux-temp/"
 	fi
 
-	cd "${TEMP}/initramfs-aux-temp/"
-	log_future_cpio_content
-	find . -print | cpio ${CPIO_ARGS} --append -F "${CPIO}" \
-			|| gen_die "compressing auxilary cpio"
-	cd "${TEMP}"
-	rm -r "${TEMP}/initramfs-aux-temp/"
+	append_to_cpio "${TEMP}/initramfs-aux-temp/" auxilliary_cpio
 }
 
 append_data() {
@@ -805,20 +685,17 @@ append_data() {
 	[ $# -eq 0 ] && gen_die "append_data() called with zero arguments"
 	if [ $# -eq 1 ] || isTrue ${var}
 	then
-	    print_info 1 "        >> Appending ${name} cpio data..."
-	    ${func} || gen_die "${func}() failed"
+		print_info 1 "		  >> Appending ${name} cpio data..."
+		${func} || gen_die "${func}() failed"
 	fi
 }
 
 create_initramfs() {
 	local compress_ext=""
 	print_info 1 "initramfs: >> Initializing..."
-
-	# Create empty cpio
 	CPIO="${TMPDIR}/initramfs-${KV}"
-	echo | cpio ${CPIO_ARGS} -F "${CPIO}" 2>/dev/null \
-		|| gen_die "Could not create empty cpio at ${CPIO}"
-
+	# Grab starter cpio archive with device nodes in it (since we can't create these inside an ebuild)
+	cp $GK_SHARE/initramfs.cpio "$CPIO" || gk_die "Could not get starter cpio"
 	append_data 'base_layout'
 	append_data 'auxilary' "${BUSYBOX}"
 	append_data 'busybox' "${BUSYBOX}"
@@ -839,15 +716,10 @@ create_initramfs() {
 	fi
 
 	append_data 'zfs' "${ZFS}"
-
 	append_data 'btrfs' "${BTRFS}"
-
 	append_data 'blkid' "${DISKLABEL}"
-
 	append_data 'unionfs_fuse' "${UNIONFS}"
-
 	append_data 'splash' "${SPLASH}"
-
 	append_data 'modprobed'
 
 	if isTrue "${FIRMWARE}" && [ -n "${FIRMWARE_SRC}" ]
@@ -865,10 +737,10 @@ create_initramfs() {
 	then
 		# Explicitly do not compress if we are integrating into the kernel.
 		# The kernel will do a better job of it than us.
-		mv ${TMPDIR}/initramfs-${KV} ${TMPDIR}/initramfs-${KV}.cpio
+		mv "$CPIO" "${CPIO}.cpio"
 		sed -i '/^.*CONFIG_INITRAMFS_SOURCE=.*$/d' ${BUILD_DST}/.config
 		cat >>${BUILD_DST}/.config	<<-EOF
-		CONFIG_INITRAMFS_SOURCE="${TMPDIR}/initramfs-${KV}.cpio${compress_ext}"
+		CONFIG_INITRAMFS_SOURCE="${CPIO}.cpio${compress_ext}"
 		CONFIG_INITRAMFS_ROOT_UID=0
 		CONFIG_INITRAMFS_ROOT_GID=0
 		EOF
@@ -891,15 +763,15 @@ create_initramfs() {
 				lzo) compression=lzop ;;
 				best|fastest)
 					for tuple in \
-							'CONFIG_RD_XZ    cmd_xz    xz' \
+							'CONFIG_RD_XZ	 cmd_xz    xz' \
 							'CONFIG_RD_LZMA  cmd_lzma  lzma' \
 							'CONFIG_RD_BZIP2 cmd_bzip2 bzip2' \
 							'CONFIG_RD_GZIP  cmd_gzip  gzip' \
-							'CONFIG_RD_LZO   cmd_lzop  lzop' \
+							'CONFIG_RD_LZO	 cmd_lzop  lzop' \
 							'CONFIG_KERNEL_LZMA  cmd_lzma  lzma' \
 							'CONFIG_KERNEL_BZIP2 cmd_bzip2 bzip2' \
 							'CONFIG_KERNEL_GZIP  cmd_gzip  gzip' \
-							'CONFIG_KERNEL_LZO   cmd_lzop  lzop'; do
+							'CONFIG_KERNEL_LZO	 cmd_lzop  lzop'; do
 						set -- ${tuple}
 						kernel_option=$1
 						cmd_variable_name=$2
@@ -929,11 +801,11 @@ create_initramfs() {
 			esac
 
 			if [ -n "${compression}" ]; then
-				print_info 1 "        >> Compressing cpio data (${compress_ext})..."
+				print_info 1 "		  >> Compressing cpio data (${compress_ext})..."
 				${compress_cmd} "${CPIO}" || gen_die "Compression (${compress_cmd}) failed"
 				mv -f "${CPIO}${compress_ext}" "${CPIO}" || gen_die "Rename failed"
 			else
-				print_info 1 "        >> Not compressing cpio data ..."
+				print_info 1 "		  >> Not compressing cpio data ..."
 			fi
 		fi
 	fi
@@ -943,7 +815,7 @@ create_initramfs() {
 		if ! isTrue "${INTEGRATED_INITRAMFS}"
 		then
 			copy_image_with_preserve "initramfs" \
-				"${TMPDIR}/initramfs-${KV}" \
+				"${CPIO}" \
 				"initramfs-${FULLNAME}"
 		fi
 	fi
