@@ -26,6 +26,9 @@ mount -o remount,rw / >/dev/null 2>&1
 # Set up symlinks
 /bin/busybox --install -s
 
+ln -s /lib /lib64
+export LD_LIBRARY_PATH=/lib
+
 if [ "$0" = '/init' ]
 then
 	[ -e /linuxrc ] && rm /linuxrc
