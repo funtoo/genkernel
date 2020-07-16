@@ -317,6 +317,7 @@ append_zfs(){
 
 	copy_binaries "${TEMP}/initramfs-zfs-temp" /sbin/{mount.zfs,zdb,zfs,zpool} ${libgccpath}
 	cd "${TEMP}/initramfs-zfs-temp/lib"
+	ln -s ${libgccpath} libgcc_s.so.1
 	append_to_cpio "${TEMP}/initramfs-zfs-temp/"
 }
 
