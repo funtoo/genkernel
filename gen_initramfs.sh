@@ -62,7 +62,7 @@ append_to_cpio() {
 	log_future_cpio_content
 	# Normalize lib directory structure to all be in /lib:
 	for libdir in lib64 usr/lib usr/lib64; do
-		if [ -d $libdir ]; then
+		if [ -d $libdir ] && ! [ -L $libdir ]; then
 			rsync -a $libdir/ lib/
 			rm -rf $libdir
 		fi
